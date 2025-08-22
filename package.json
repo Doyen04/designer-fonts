@@ -1,0 +1,22 @@
+{
+  "name": "font-loader",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsx fonts.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sola Ademola",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "fs": "^0.0.1-security",
+    "https": "^1.0.0",
+    "https-proxy-agent": "^7.0.6",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.4"
+  }
+}
