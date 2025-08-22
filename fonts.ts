@@ -3,10 +3,7 @@ import path from 'path';
 import https from 'https';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
-const proxyUrl =
-    process.env.HTTPS_PROXY ||
-    process.env.HTTP_PROXY ||
-    'http://172.27.192.151:8080';
+const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || 'http://172.27.192.151:8080';
 const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
 
 console.log(proxyUrl, agent);
@@ -16,9 +13,7 @@ function downloadFile(url: string, destPath: string): Promise<void> {
         https
             .get(url, { agent }, (res) => {
                 if (res.statusCode !== 200) {
-                    return reject(
-                        new Error(`Failed: ${url} - ${res.statusCode}`)
-                    );
+                    return reject(new Error(`Failed: ${url} - ${res.statusCode}`));
                 }
                 const fileStream = fs.createWriteStream(destPath);
                 res.pipe(fileStream);
@@ -33,21 +28,15 @@ function fetchCSS(url: string): Promise<string> {
         https
             .get(url, { agent }, (res) => {
                 if (res.statusCode !== 200) {
-                    console.error(
-                        `⨯ Failed to fetch CSS from ${url}: ${res.statusCode}`
-                    );
-                    return reject(
-                        new Error(`Failed to fetch CSS: ${res.statusCode}`)
-                    );
+                    console.error(`⨯ Failed to fetch CSS from ${url}: ${res.statusCode}`);
+                    return reject(new Error(`Failed to fetch CSS: ${res.statusCode}`));
                 }
 
                 console.log(`✓ Fetching CSS from ${url}`);
                 let data = '';
                 res.on('data', (chunk) => (data += chunk));
                 res.on('end', () => {
-                    console.log(
-                        `✓ CSS fetched successfully (${data.length} bytes)`
-                    );
+                    console.log(`✓ CSS fetched successfully (${data.length} bytes)`);
                     resolve(data);
                 });
             })
@@ -70,11 +59,16 @@ function extractFontUrls(css: string): string[] {
     return urls;
 }
 
-async function downloadFonts(
-    fonts: Record<string, string[]>,
-    outDir = './downloaded-fonts'
-) {
+function writeFontUrlsToJson(fontUrls: Record<string, string[]>, filePath: string) {
+    const jsonData = JSON.stringify(fontUrls, null, 2);
+    fs.writeFileSync(filePath, jsonData, 'utf8');
+    console.log(`✓ Font URLs written to ${filePath}`);
+}
+
+async function downloadFonts(fonts: Record<string, string[]>, outDir = './downloaded-fonts') {
     fs.mkdirSync(outDir, { recursive: true });
+
+    const allFontUrls: Record<string, string[]> = {};
 
     const tasks: Promise<void>[] = [];
     for (const [fontName, cssUrls] of Object.entries(fonts)) {
@@ -88,58 +82,44 @@ async function downloadFonts(
                         console.log(`Processing ${fontName}...`);
 
                         const css = await fetchCSS(cssUrl);
-                        console.log(css);
 
                         // Extract font file URLs from CSS
                         const fontUrls = extractFontUrls(css);
+                        console.log(fontUrls);
 
                         if (fontUrls.length === 0) {
-                            console.log(
-                                `⚠ No font files found for ${fontName}`
-                            );
+                            console.log(`⚠ No font files found for ${fontName}`);
                             return;
                         }
 
-                        // Download each font file - wrap each in try/catch
-                        const fontTasks = fontUrls.map(
-                            async (fontUrl, index) => {
-                                try {
-                                    const extension = fontUrl.includes('.woff2')
-                                        ? '.woff2'
-                                        : '.woff';
-                                    const filename = `${fontName.replace(
-                                        /\s+/g,
-                                        '-'
-                                    )}-${index}${extension}`;
-                                    const dest = path.join(fontDir, filename);
+                        allFontUrls[fontName] = fontUrls;
 
-                                    await downloadFile(fontUrl, dest);
-                                    console.log(
-                                        `✓ Downloaded ${fontName} → ${filename}`
-                                    );
-                                } catch (err) {
-                                    console.error(
-                                        `⨯ Failed to download ${fontName} file ${index}: ${err.message}`
-                                    );
-                                }
+                        // Download each font file - wrap each in try/catch
+                        const fontTasks = fontUrls.map(async (fontUrl, index) => {
+                            try {
+                                let extension = '.woff2'; // default
+                                if (fontUrl.includes('.ttf')) extension = '.ttf';
+                                else if (fontUrl.includes('.woff2')) extension = '.woff2';
+                                else if (fontUrl.includes('.woff')) extension = '.woff';
+                                else if (fontUrl.includes('.otf')) extension = '.otf';
+
+                                const filename = `${fontName.replace(/\s+/g, '-')}-${index}${extension}`;
+                                const dest = path.join(fontDir, filename);
+
+                                await downloadFile(fontUrl, dest);
+                                console.log(`✓ Downloaded ${fontName} → ${filename}`);
+                            } catch (err) {
+                                console.error(`⨯ Failed to download ${fontName} file ${index}: ${err.message}`);
                             }
-                        );
+                        });
 
                         const res = await Promise.allSettled(fontTasks);
-                        const successful = res.filter(
-                            (r) => r.status === 'fulfilled'
-                        ).length;
-                        const failed = res.filter(
-                            (r) => r.status === 'rejected'
-                        ).length;
-                        console.log(
-                            `\n✓ Download complete: ${successful} successful, ${failed} failed`
-                        );
+                        const successful = res.filter((r) => r.status === 'fulfilled').length;
+                        const failed = res.filter((r) => r.status === 'rejected').length;
+                        console.log(`\n✓ Download complete: ${successful} successful, ${failed} failed`);
                         console.log(`✓ Completed processing ${fontName}`);
                     } catch (err) {
-                        console.error(
-                            `⨯ Failed to process ${fontName}: ${err.message}`
-                        );
+                        console.error(`⨯ Failed to process ${fontName}: ${err.message}`);
                     }
                 })()
             );
@@ -149,12 +129,13 @@ async function downloadFonts(
     // Use Promise.allSettled instead of Promise.all
     const results = await Promise.allSettled(tasks);
 
+    const urlsJsonPath = path.join('./', 'font-urls.json');
+    writeFontUrlsToJson(allFontUrls, urlsJsonPath);
+
     const successful = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;
 
-    console.log(
-        `\n✓ Download complete: ${successful} successful, ${failed} failed`
-    );
+    console.log(`\n✓ Download complete: ${successful} successful, ${failed} failed`);
 }
 
 function loadFontsFromJson(filePath: string) {
