@@ -106,7 +106,7 @@ async function downloadFonts(fonts: Record<string, string[]>, outDir = './downlo
                                 const filename = `${fontName.replace(/\s+/g, '-')}-${index}${extension}`;
                                 const dest = path.join(fontDir, filename);
 
-                                await downloadFile(fontUrl, dest);
+                                // await downloadFile(fontUrl, dest);
                                 console.log(`✓ Downloaded ${fontName} → ${filename}`);
                             } catch (err) {
                                 console.error(`⨯ Failed to download ${fontName} file ${index}: ${err.message}`);
@@ -130,7 +130,14 @@ async function downloadFonts(fonts: Record<string, string[]>, outDir = './downlo
     const results = await Promise.allSettled(tasks);
 
     const urlsJsonPath = path.join('./', 'font-urls.json');
-    writeFontUrlsToJson(allFontUrls, urlsJsonPath);
+    const sortedFontUrls = Object.keys(allFontUrls)
+        .sort()
+        .reduce((sorted, key) => {
+            sorted[key] = allFontUrls[key];
+            return sorted;
+        }, {} as Record<string, string[]>);
+
+    writeFontUrlsToJson(sortedFontUrls, urlsJsonPath);
 
     const successful = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;
