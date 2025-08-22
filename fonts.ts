@@ -85,7 +85,6 @@ async function downloadFonts(fonts: Record<string, string[]>, outDir = './downlo
 
                         // Extract font file URLs from CSS
                         const fontUrls = extractFontUrls(css);
-                        console.log(fontUrls);
 
                         if (fontUrls.length === 0) {
                             console.log(`⚠ No font files found for ${fontName}`);
@@ -106,7 +105,7 @@ async function downloadFonts(fonts: Record<string, string[]>, outDir = './downlo
                                 const filename = `${fontName.replace(/\s+/g, '-')}-${index}${extension}`;
                                 const dest = path.join(fontDir, filename);
 
-                                // await downloadFile(fontUrl, dest);
+                                await downloadFile(fontUrl, dest);
                                 console.log(`✓ Downloaded ${fontName} → ${filename}`);
                             } catch (err) {
                                 console.error(`⨯ Failed to download ${fontName} file ${index}: ${err.message}`);
